@@ -39,11 +39,30 @@ class TextFileReader {
     FILE *ptr_file;
     char buf[8000];
     int line_number;
+
+    // trim line ending off
+    void trimBuf() {
+        int n=strlen(buf);
+        while(n>0) {
+            n--;
+            if(buf[n]=='\n' || buf[n]=='\r') {
+                buf[n]=0;
+                continue;
+            } else {
+                break;
+            }
+        }
+    }
+
 public:
     TextFileReader(const char* zFile) {
-    	ptr_file =fopen("input.txt","r");
+    	ptr_file =fopen(zFile,"r");
         line_number = 0;
-        assert(ptr_file);
+        buf[0] = 0;
+        if (! ptr_file) {
+            fprintf(stderr,"File not found: %s\n", zFile);
+            exit(1);
+        }
     }
 
     ~TextFileReader() {
@@ -54,8 +73,10 @@ public:
    
     bool AtEof() {
         if (fgets(buf,8000, ptr_file) == NULL) {
+            trimBuf();
             return true;
         } else {
+            trimBuf();
             line_number++;
             return false;
         }
