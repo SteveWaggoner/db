@@ -14,6 +14,9 @@
 
 #define NENTRIES(array) ((int) (sizeof(array) / sizeof(array[0])))
 
+#include "db.h"
+#include "db_py.h"
+
 inline bool streq(const char *s1, const char *s2) {
     return strcmp(s1, s2) == 0;
 }
@@ -141,6 +144,8 @@ void usage(void)
 "  -a          sample 6 records from all tables\n"
 "  -m SIZE     truncate field values to size for use with '-p' and '-a'\n"
 "  -S[FIELDS]  sum fields\n"
+"\n"
+"  -P <PYTHON> declare python 3.x functions to use in SQL expressions\n"
 "\n"
 "When FILE is -, read standard input.\n"
 "\n"
@@ -527,7 +532,63 @@ public:
     {
         return zTailM;
     }
+
+    bool nextRow(vector<Variant> *pRowValues) {
+    
+        pRowValues->clear();
+
+        int status = sqlite3_step(stmtHandleM);
+        if (status == SQLITE_ROW)
+        {
+            for(int i=0; i < sqlite3_column_count(stmtHandleM); i++) {
+
+                Variant var;
+                switch (sqlite3_column_type(stmtHandleM, i)) {
+                    case SQLITE_INTEGER:
+                        var.type='i';
+                        var.num = sqlite3_column_int(stmtHandleM, i);
+                        break;
+
+                    case SQLITE_FLOAT:
+
+                        var.type='d';
+                        var.num = sqlite3_column_double(stmtHandleM, i);
+                        break;
+
+                    case SQLITE_TEXT:
+
+                        var.type='s';
+                        strncpy(var.str, (char*) sqlite3_column_text(stmtHandleM, i), 250);
+                        break;
+                }
+
+                pRowValues->push_back(var);
+
+            }
+            return true;
+        } else {
+            return false;
+        }
+
+    }
 };
+
+void api_getColumnNames(Statement *pStmt, vector<string> *pColNames) {
+
+    if ( pStmt && pColNames ) {
+        pStmt->GetColumnNames(*pColNames);
+    }
+}
+
+bool api_nextRow(Statement *pStmt, vector<Variant> *pRowValues) {
+
+    if ( pStmt ) {
+        return pStmt->nextRow(pRowValues);
+    } else {
+        return false;
+    }
+}
+
 
 
 void closeDatabase() 
@@ -1410,9 +1471,13 @@ void getArgumentFields(char *zArgument, vector<string>& vFields)
 }
 ////////////////////////////////////////////////////////////////////////////
 
+bool hasArg(char *zArg) {
+    return ! (zArg == NULL || zArg[0] == '-');
+}
+
 void checkArg(char *zArg)
 {
-    if (zArg == NULL || zArg[0] == '-') {
+    if (!hasArg(zArg)) {
         usage();
     }
 }
@@ -1851,6 +1916,33 @@ int main(int argc, char *argv[])
                     argindex++;
                     checkArg(argv[argindex]);
                     nNumberOfFirstUnnamedFieldG = atoi(argv[argindex]);
+                    break;
+                    }
+
+                  case 'P':
+                    {
+                    argindex++;
+                    checkArg(argv[argindex]);
+                    runPython(dbHandleG, argv[argindex], fVerboseG);
+                    break;
+                    }
+
+                  case 'L':
+                    {
+                    string queryLastTable = "select * from t"+intToText(nTableCountG);
+                    Statement stmt (queryLastTable.c_str());
+
+                    argindex++;
+                    checkArg(argv[argindex]);
+                    const char* varName = argv[argindex];
+
+                    if ( hasArg(argv[argindex+1]) ) {
+                        argindex++;
+                        const char* pkName = argv[argindex];
+                        loadTableIntoPythonDict(dbHandleG, &stmt, varName, pkName);
+                    } else {
+                        loadTableIntoPythonList(dbHandleG, &stmt, varName);
+                    }
                     break;
                     }
 
