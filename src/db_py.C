@@ -38,17 +38,32 @@ PythonFunction* findPythonFunction(const char* name) {
 int isPyInitialized=0;
 int pyModuleCount=0;
 
-void ensurePythonInitialized() {
+void ensurePythonInitialized(bool verbose) {
 
     if ( isPyInitialized == 0 ) {
+        if (verbose) {
+            fprintf(stderr,"starting python...\n");
+        }
+        Py_UnbufferedStdioFlag = 1;
         Py_Initialize();
         isPyInitialized = 1;
     }
 }
 
+void terminatePython(bool verbose) {
+
+    if ( isPyInitialized == 1 ) {
+        if ( verbose ) {
+            fprintf(stderr,"stopping python...\n");
+        }
+        runPython(NULL, "import sys\nsys.stdout.flush()", false);
+        Py_Finalize();
+    }
+}
+
 int runPython(sqlite3 *db, const char* script, bool verbose) 
 {
-    ensurePythonInitialized();
+    ensurePythonInitialized(verbose);
 
     if ( verbose ) {
         fprintf(stderr, "Python:\n%s\n", script);
@@ -227,9 +242,9 @@ int runPythonEx(sqlite3 *db, const char *script, const char* moduleName)
 }
 
 #include "db.h"
-void loadTableIntoPythonDict(sqlite3 *db, Statement *pStmt, const char* varName, const char* pkName) {
+void loadTableIntoPythonDict(sqlite3 *db, Statement *pStmt, const char* varName, const char* pkName, bool verbose) {
 
-    ensurePythonInitialized();
+    ensurePythonInitialized(verbose);
 
     vector<string> colNames;
     vector<Variant> rowValues;
@@ -293,9 +308,9 @@ void loadTableIntoPythonDict(sqlite3 *db, Statement *pStmt, const char* varName,
     PyObject_SetAttrString(pLastModuleG, varName, pDict);
 }
 
-void loadTableIntoPythonList(sqlite3 *db, Statement *pStmt, const char* varName) {
+void loadTableIntoPythonList(sqlite3 *db, Statement *pStmt, const char* varName, bool verbose) {
 
-    ensurePythonInitialized();
+    ensurePythonInitialized(verbose);
 
     vector<Variant> rowValues;
 

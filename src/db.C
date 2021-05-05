@@ -146,6 +146,7 @@ void usage(void)
 "  -S[FIELDS]  sum fields\n"
 "\n"
 "  -P <PYTHON> declare python 3.x functions to use in SQL expressions\n"
+"  -L <VAR> [PK] load last table into python global variable\n"
 "\n"
 "When FILE is -, read standard input.\n"
 "\n"
@@ -1924,12 +1925,13 @@ int main(int argc, char *argv[])
                     argindex++;
                     checkArg(argv[argindex]);
                     runPython(dbHandleG, argv[argindex], fVerboseG);
+                    fOutputData = false;
                     break;
                     }
 
                   case 'L':
                     {
-                    string queryLastTable = "select * from t"+intToText(nTableCountG);
+                    string queryLastTable = "select * from "+getLastTable();
                     Statement stmt (queryLastTable.c_str());
 
                     argindex++;
@@ -1939,9 +1941,9 @@ int main(int argc, char *argv[])
                     if ( hasArg(argv[argindex+1]) ) {
                         argindex++;
                         const char* pkName = argv[argindex];
-                        loadTableIntoPythonDict(dbHandleG, &stmt, varName, pkName);
+                        loadTableIntoPythonDict(dbHandleG, &stmt, varName, pkName, fVerboseG);
                     } else {
-                        loadTableIntoPythonList(dbHandleG, &stmt, varName);
+                        loadTableIntoPythonList(dbHandleG, &stmt, varName, fVerboseG);
                     }
                     break;
                     }
@@ -1972,6 +1974,7 @@ int main(int argc, char *argv[])
         runQuery("select * from "+getLastTable());
     }
 
+    terminatePython(fVerboseG);
     closeDatabase();
     return 0;
 }
