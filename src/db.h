@@ -9,6 +9,8 @@
 
 #include "db_py.h"
 
+extern sqlite3 *dbHandleG;
+
 using namespace std;
 
 class Statement;
@@ -21,6 +23,13 @@ struct Variant {
     double real; // 'd'
 };
 
+
+const char* api_lastError();
+
+void api_runCommand(const char* zSQL);
+
+Statement* api_newStatement(const char* zSQL);
+void api_deleteStatement(Statement* pStmt);
 void api_getColumnNames(Statement *pStmt, vector<string> *pColNames);
 bool api_nextRow(Statement *pStmt, vector<Variant> *pRowValues);
 

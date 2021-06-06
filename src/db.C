@@ -207,6 +207,33 @@ void checkReturn(int rc, const char *zSql=NULL)
     }
 }
 
+char lastErrorG[2048];
+bool hasErrorG=false;
+
+void api_checkReturn(int rc, const char* zSql=NULL)
+{
+    if ( rc != SQLITE_OK ) {
+        if(zSql)
+            sprintf(lastErrorG, "%s - \"%s\"\n", sqlite3_errmsg(dbHandleG), zSql);
+        else
+            sprintf(lastErrorG, "%s\n", sqlite3_errmsg(dbHandleG));
+        hasErrorG = true;
+    }
+}
+
+void api_clearError() {
+    hasErrorG = false;
+}
+
+const char* api_lastError() {
+    if ( hasErrorG ) {
+        return lastErrorG;
+    } else {
+        return NULL;
+    }
+}
+
+
 bool isPipe(const char *zFilename)
 {
     struct stat sb;
@@ -399,8 +426,13 @@ class Statement
 
 public:
 
-    Statement(const char *zSql) {
-        checkReturn ( sqlite3_prepare_v2(dbHandleG, zSql, strlen(zSql), &stmtHandleM, &zTailM), zSql );
+    Statement(const char *zSql, bool api=false) {
+        if ( api ) {
+            api_clearError();
+            api_checkReturn( sqlite3_prepare_v2(dbHandleG, zSql, strlen(zSql), &stmtHandleM, &zTailM), zSql );
+        } else {
+            checkReturn ( sqlite3_prepare_v2(dbHandleG, zSql, strlen(zSql), &stmtHandleM, &zTailM), zSql );
+        }
     }
     ~Statement() {
         checkReturn ( sqlite3_finalize(stmtHandleM) );
@@ -574,6 +606,15 @@ public:
     }
 };
 
+
+Statement* api_newStatement(const char* zSQL) {
+    return new Statement(zSQL,true);
+}
+
+void api_deleteStatement(Statement* pStmt) {
+    delete pStmt;
+}
+
 void api_getColumnNames(Statement *pStmt, vector<string> *pColNames) {
 
     if ( pStmt && pColNames ) {
@@ -665,6 +706,7 @@ string getLastTable()
     else                return "";
 }
 
+
 void runCommand(string sql, bool printCmd=true)
 {
     const char *zHead = sql.c_str();
@@ -693,7 +735,7 @@ void runCommand(string sql, bool printCmd=true)
     while(strlen(zHead) > 0) {
 
         Statement stmt(zHead);
-        stmt.Execute();
+        stmt.Execute();  //exits on syntax error
         zHead = stmt.NextSql();
     }
 
@@ -716,6 +758,10 @@ void runCommand(string sql, bool printCmd=true)
                     (double) (tv2.tv_usec - tv1.tv_usec) / 1000000 +
                     (double) (tv2.tv_sec - tv1.tv_sec));
     }
+}
+
+void api_runCommand(const char* zSQL) {
+    return runCommand(string(zSQL));
 }
 
 void runQuery(string sql, bool fSample=false)
@@ -1500,6 +1546,7 @@ int main(int argc, char *argv[])
 
     initializeDatabase();
     bool fOutputData = false;
+    bool fHasWorkbook= false;
     for (int argindex = 1; argindex < argc; argindex++) {
         if (argv[argindex][0] == '-' && !streq(argv[argindex],"-")) {
 	    char *argstr = argv[argindex] + 1;
@@ -1929,6 +1976,15 @@ int main(int argc, char *argv[])
                     break;
                     }
 
+                  case 'W':
+                    {
+                    argindex++;
+                    checkArg(argv[argindex]);
+                    loadWorkbook(dbHandleG, argv[argindex], fVerboseG);
+                    fHasWorkbook = true;
+                    break;
+                    }
+
                   case 'L':
                     {
                     string queryLastTable = "select * from "+getLastTable();
@@ -1972,6 +2028,10 @@ int main(int argc, char *argv[])
 
     if(fOutputData) {
         runQuery("select * from "+getLastTable());
+    }
+
+    if(fHasWorkbook) {
+        runWorkbooks(dbHandleG, fVerboseG);
     }
 
     terminatePython(fVerboseG);
