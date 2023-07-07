@@ -1,2 +1,2 @@
 # db
-SQLite wrapper
+My awesome SQLite wrapper
