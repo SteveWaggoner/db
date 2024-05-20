@@ -743,7 +743,12 @@ void runCommand(string sql, bool printCmd=true)
         char s[16] = {};
         strncpy(s, sql.c_str(), 10);
         s[6] = 0;
-        strupr(s);
+	//strupr()
+	char *str = s; 
+	while (*str != '\0') {
+		*str = toupper((unsigned char)*str);
+		str++;
+	}
         if (strncmp(s,"UPDATE",6)==0||
                 strncmp(s,"DELETE",6)==0||
                 strncmp(s,"INSERT",6)==0) {
